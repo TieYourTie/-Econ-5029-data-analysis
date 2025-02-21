@@ -347,13 +347,5 @@ HCC_half_half <- HCC_half_half %>%
   group_by(REF_DATE, GEO)
 
 
-CC_half_half_sorted <- HCC_half_half %>%
-  # 1) 提取年份
-  mutate(Year = year(as.Date(REF_DATE))) %>%
-  # 2) 按城市和年份升序排列
-  arrange(GEO, Year)
-
-
-write.csv(CC_half_half_sorted, "construction_wage.csv")
 
 
