@@ -7,7 +7,8 @@
   #Housing permit monthly (province and CMA)
   #https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=3410000301
 
-
+#3 average construction cost 
+# https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=1810004601
 
 rm(list = ls())
 #make sure everthing will be fine.)
@@ -307,29 +308,43 @@ filtered_data_na_freee <- filtered_data %>%
 write.csv(Housing_permit_semi_cook, "Housing_permit_all_cleaned.csv")
 
 ################################################################################
-#2.0 The housing permit both province and CMA level
+#3.0 The housing construction cost by CMA monthly? 
 ################################################################################
 
 
+# Use either double backslashes or forward slashes in the file path
+HCC.raw <- read_csv("H:/我的云端硬盘/Mac things/2025 winter/Econ 5029w/5029 project/Data cleaning processing/Code/RAW_data/Construction_wage/1810004601_databaseLoadingData.csv")
+
+# Check if the data loaded correctly
+head(HCC.raw)
+
+#keep only relative variable
+HCC.ts <- HCC.raw %>%
+  select("REF_DATE", "GEO", "Construction trades",  "VALUE")
 
 
+#rename the variable 
+HCC.ts <- HCC.ts %>% 
+  rename( Construction_trades = `Construction trades`)
+
+HCC_p.ts <- HCC.ts %>%
+  pivot_wider(
+    names_from = Construction_trades,  # 将 "Construction_trades" 作为列名
+    values_from = VALUE  # "VALUE" 作为新列的数据
+  ) %>%
+  arrange(REF_DATE)
+
+HCC_half.ts <- HCC_p.ts %>%
+  group_by(REF_DATE, GEO) %>%
+  mutate(midwage = median(c_across(3:18), na.rm = TRUE))  # Calculate median wage across all trades
 
 
+HCC_half_half <- HCC_half.ts %>% 
+  select(REF_DATE, GEO, midwage)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+HCC_half_half <- HCC_half_half %>% 
+  group_by(REF_DATE, GEO)
 
 
 
