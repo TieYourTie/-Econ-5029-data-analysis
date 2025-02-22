@@ -308,7 +308,7 @@ filtered_data_na_freee <- filtered_data %>%
 write.csv(Housing_permit_semi_cook, "Housing_permit_all_cleaned.csv")
 
 ################################################################################
-#3.0 The housing construction cost by CMA monthly? 
+#3.0 The housing construction wage
 ################################################################################
 
 
@@ -353,15 +353,107 @@ HCC_half_half <- HCC_half_half %>%
 ################################################################################
 #4.0 The CMA population data
 ################################################################################
+################################################################################
+#5.0 The housing price index
+################################################################################
+
+#lode the data
+New_housing_supply.raw <- read_csv("H:\我的云端硬盘\Mac things\2025 winter\Econ 5029w\5029 project\Data cleaning processing\Code\RAW_data\Housing price index\1810020501_databaseLoadingData.csv")
+
+#housing price index 
+housing_price_index <- New_housing_supply.raw 
+
+
+
+#check the col names
+housing_price_index <- New_housing_supply.raw %>%
+  select("REF_DATE", "GEO" ,"New housing price indexes", "VALUE" )
+
+  
+
+#change the name
+housing_price_index <- housing_price_index %>%
+  rename(NHPI = `New housing price indexes`)
+
+
+#pivot the data
+housing_price_index_pivot <- housing_price_index %>% 
+  pivot_wider(names_from = NHPI, values_from = VALUE)
+
+
+#rename the variable to R friendly
+housing_price_index_pivot  <- housing_price_index_pivot %>% 
+  rename( Total = `Total (house and land)`,
+          House =  `House only`,
+          Land = `Land only`)
+
+
+#remove the row with housing_starts, housing_under_construction and housing_completions are both NA. 
+HPI <-housing_price_index_pivot %>%
+  group_by(REF_DATE, GEO) %>% 
+  filter(!(is.na(Total) & is.na(House) & is.na(Land))) %>%
+  ungroup()
+
+#save the file
+write.csv(HPI, "HPI.csv")
+
+
 
 
 
 
 ################################################################################
+#6.0 The population data
+################################################################################
+
+#lode the data
+population_data <- read_csv("Population data/population data.csv")
+
+# Filter only city names and keep "Canada"
+population_data_filtered <- population_data %>%
+  # Remove descriptors like "(CMA)", "(CA)", and province names
+  mutate(City = gsub(" \\(CMA\\)| \\(CA\\)|,.*", "", GEO)) %>%
+  # Remove general/non-city entries but keep "Canada"
+  filter(GEO == "Canada" | !grepl("All census|All areas|Area outside", GEO))
+
+# Display unique city names
+unique(population_data_filtered$GEO)
+  
+
+pd <- population_data_filtered %>% select ("REF_DATE", "GEO" , "VALUE")
+
+
+
+
+
+#save the file
+write.csv(pd, "pd.csv")
 
 
 
 
 
 
+#7.0 policy rate cleaning
+####################################################################################
 
+
+policy_rate <- read_csv("policy_rate/policy_rate.csv")
+View(policy_rate)
+
+
+policy_rate$REF_DATE <- as.Date(policy_rate$REF_DATE)
+
+PR_filtered <- policy_rate %>% 
+  filter(REF_DATE>= as.Date("1992-12-01"))
+
+
+# 填充 NA
+PR_filtered  <- PR_filtered %>%
+  arrange(REF_DATE) %>%  # 确保按日期排序
+  fill(VALUE, .direction = "down")
+
+print(PR_filtered )
+
+
+write.csv(PR_filtered, "PR.csv")
