@@ -1,4 +1,6 @@
-#Econ 5029 data cleaning code. 
+########################################################################
+#Econ 5029 data cleaning code.                                         #
+########################################################################
 #1. The housing start data
   #1.1 The housing start data (National quartly)
   #1.2 The housing start data (CMA monthly )
@@ -8,17 +10,18 @@
   #https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=3410000301
 
 #3 average construction cost 
-# https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=1810004601
+  #https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=1810004601
+#4.0 The CMA population data
+#5.0 The housing price index
+#6.0 The population data
+#Lode the function######################################################
 
 rm(list = ls())
 #make sure everthing will be fine.)
 
 #Step one Lode the all package that necessary. 
 library (lubridate)    
-library (cansim)       
-library (OECD)        
 library (WDI)          
-library (fredr)        
 library (mFilter)      
 library (neverhpfilter)
 library (tsbox)
@@ -28,6 +31,9 @@ library(wesanderson)
 library(writexl)
 library(tidyverse)
 library(readr)
+#lode the date #########################################################
+#Construction wage
+Construction_wage<- read_csv("~/Documents/GitHub/-Econ-5029-data-analysis/RAW_data/Construction_wage/1810004601_databaseLoadingData.csv")
 
 
 ################################################################################
