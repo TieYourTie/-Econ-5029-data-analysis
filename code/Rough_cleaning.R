@@ -32,6 +32,7 @@ library(writexl)
 library(tidyverse)
 library(readr)
 #lode the date #########################################################
+
 #Construction wage
 Construction_wage<- read_csv("~/Documents/GitHub/-Econ-5029-data-analysis/RAW_data/Construction_wage/1810004601_databaseLoadingData.csv")
 

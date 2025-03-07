@@ -9,6 +9,8 @@
     #using checkresiduals() for check the residual
     #adf.test() for the adf() test
 
+#things I need to do again
+  
 ############################################################
 rm(list = ls())
 #make sure everthing will be fine.)
