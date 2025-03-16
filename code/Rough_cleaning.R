@@ -14,6 +14,17 @@
 #4.0 The CMA population data
 #5.0 The housing price index
 #6.0 The population data
+
+
+
+# Yes, if it’s possible, could you add: - housing supply/permits for each type of housing (apartments, houses, etc separately) 
+#Then for the VAR: 
+#  - construction costs (so the general producer price index unless you find something better) 
+#- building permits for different housing types 
+#- policy rate 
+#- housing prices 
+
+
 #Lode the function######################################################
 
 rm(list = ls())
