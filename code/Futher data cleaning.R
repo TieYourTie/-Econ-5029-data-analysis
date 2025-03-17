@@ -36,6 +36,11 @@ library(tseries)
 library(ggplot2)
 library(ggthemes)  # For Economist theme
 library(dplyr)
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(zoo)
+
 ############################################################
 #Step one lode the data
 ################################################################################
@@ -107,15 +112,15 @@ autoplot(PR.ts) +
 ################################################################################
 
 # 提取唯一城市名并转换为数据框
-HPI_list <- data.frame(GEO = unique(HPI.raw$GEO))
-NHS_list <- data.frame(GEO = unique(NHS.raw$GEO))
-pd_list <- data.frame(GEO = unique(pd.raw$GEO))
+#HPI_list <- data.frame(GEO = unique(HPI.raw$GEO))
+#NHS_list <- data.frame(GEO = unique(NHS.raw$GEO))
+#pd_list <- data.frame(GEO = unique(pd.raw$GEO))
 
 # 合并三个数据框，按GEO列合并
-combined_list <- reduce(list(HPI_list, NHS_list, pd_list), full_join, by = "GEO")
+#combined_list <- reduce(list(HPI_list, NHS_list, pd_list), full_join, by = "GEO")
 
 # 输出为 Excel 文件
-write.xlsx(combined_list, "combined_list.xlsx")
+#write.xlsx(combined_list, "combined_list.xlsx")
 
 #lode the cleaned dictionary 
 dictnoray <- read_excel("combined_list.xlsx")
@@ -126,8 +131,7 @@ dictnoray <- read_excel("combined_list.xlsx")
 
 #remove the dictonary that is empty in the post_cost 
 list_clean <- dictnoray %>% 
-  mutate(Post_code = ifelse(GEO == "Canada", "CA", Post_code),
-         Post_code = ifelse(GEO == "Canada", "CA", Post_code) 
+  mutate(Post_code = ifelse(GEO == "Canada", "CA", Post_code))
 
 #remove the empty (whitch is not the city)
 list_clean <- list_clean %>% na.omit()
@@ -169,9 +173,102 @@ NHS <- NHS %>%
 #combine those together
 NHS_HPI <- NHS %>% 
   left_join(HPI, by = c("Post_code", "REF_DATE"))
-#####
+
+################################################################################
+#the population data organized
+################################################################################
+
+#choice the variable
+pd <- pd.raw %>% select("REF_DATE", "GEO" , "VALUE")
+
 #now its the time to processing the population data 
-pd.ts <- ts(pd.raw, frequency = 1 , from = min(Ref_date), to = max(Ref-date) )
+pd <- pd %>%
+  mutate(REF_DATE = as.integer(REF_DATE))
+
+
+# Step 1: Expand data to monthly for each region
+pd_monthly <- pd %>%
+  group_by(GEO) %>%  # Group by region
+  arrange(GEO, REF_DATE) %>%  # Ensure sorted order within each region
+  mutate(REF_DATE = as.yearmon(REF_DATE)) %>%  # Convert REF_DATE to yearmon format
+  complete(REF_DATE = seq(from = min(REF_DATE), to = max(REF_DATE), by = 1/12)) %>%  # Expand monthly
+  ungroup()  # Remove grouping for interpolation
+
+# Step 2: Interpolate missing population values for each region
+pd_monthly <- pd_monthly %>%
+  group_by(GEO) %>%  # Group again for region-wise interpolation
+  mutate(VALUE = na.approx(VALUE, na.rm = FALSE)) %>%
+  ungroup()  # Remove grouping
+
+# Step 3: Convert REF_DATE back to a Date format
+pd_monthly <- pd_monthly %>%
+  mutate(REF_DATE = as.Date(as.yearmon(REF_DATE), frac = 0))
+
+# View results
+print(pd_monthly, n = 24)  # Show first 24 rows
+
+
+################################################################################
+#the time for the left join
+pd_monthly <- pd_monthly %>% 
+  left_join(list_clean, by = "GEO")
+
+#remove the na part from the post code
+pd_monthly <- pd_monthly %>% 
+  filter(!is.na(Post_code))
+
+
+NHS_HPI_ts <- NHS_HPI %>%
+  group_by(Post_code) %>%
+  arrange(Post_code, REF_DATE) %>%
+  mutate(REF_DATE = as.yearmon(REF_DATE))
+
+#########
+
+pd_monthly <- pd_monthly %>%
+  group_by(Post_code) %>%
+  arrange(Post_code, REF_DATE) %>%
+  mutate(REF_DATE = as.yearmon(REF_DATE))
+
+#rename the variable 
+pd_monthly <- pd_monthly %>% rename("population" = "VALUE")
+
+
+##combine those together
+NHS_HPI_pd <- NHS_HPI_ts  %>% 
+  left_join(pd_monthly, by = c("Post_code", "REF_DATE"))
+
+
+
+
+
+#combine those together
+NHS_HPI_pd <- NHS_HPI %>% 
+  left_join(pd_monthly, by = c("Post_code", "REF_DATE"))
+
+
+
+
+
+
+/
+# Display the result
+print(pd_monthly, n = 24)  # Show first 24 rows
+
+
+
+#
+pd <- pd %>%
+  mutate(REF_DATE = year(REF_DATE))  
+
+
+##########
+pd_month <- pd %>%
+  slice(rep(1:n(), each = 12)) %>%
+  mutate(
+    Month = rep(1:12, times = nrow(pd)),  # Repeat months 1-12 for each row
+    REF_DATE = as.Date(paste0(format(REF_DATE, "%Y"), "-", Month, "-01"))  # Create proper Date format
+  ) 
 
 
 #####
