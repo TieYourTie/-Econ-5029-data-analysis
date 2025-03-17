@@ -1,28 +1,24 @@
 ########################################################################
 #Econ 5029 data cleaning code.                                         #
 ########################################################################
-#1. The housing start data
+#update 2025/03/16 
+
+#The data cleaning note:
+#1. The housing start data 
   #1.1 The housing start data (National quartly)
-  #1.2 The housing start data (CMA monthly )
+  #1.2 The housing start data (CMA monthly)
 
 #2 Housing permit
   #Housing permit monthly (province and CMA)
   #https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=3410000301
 
 #3 average construction cost 
-  #https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=1810004601
+  #https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=1810004601\
+  #The general producer price index 
 #4.0 The CMA population data
 #5.0 The housing price index
 #6.0 The population data
-
-
-
-# Yes, if it’s possible, could you add: - housing supply/permits for each type of housing (apartments, houses, etc separately) 
-#Then for the VAR: 
-#  - construction costs (so the general producer price index unless you find something better) 
-#- building permits for different housing types 
-#- policy rate 
-#- housing prices 
+#7.0 The policy rate
 
 
 #Lode the function######################################################
@@ -32,7 +28,6 @@ rm(list = ls())
 
 #Step one Lode the all package that necessary. 
 library (lubridate)    
-library (WDI)          
 library (mFilter)      
 library (neverhpfilter)
 library (tsbox)
@@ -42,6 +37,8 @@ library(wesanderson)
 library(writexl)
 library(tidyverse)
 library(readr)
+
+
 #lode the date #########################################################
 
 #Construction wage
@@ -52,11 +49,12 @@ Construction_wage<- read_csv("~/Documents/GitHub/-Econ-5029-data-analysis/RAW_da
 #1.1 The housing start data (province quarterly)
 ################################################################################
 #lode the data
-HS.raw<- read_csv("~/Library/CloudStorage/GoogleDrive-brownlovecake2009@gmail.com/我的云端硬盘/Mac things/2025 winter/Econ 5029w/5029 project/Data cleaning processing/Data/Housing start/34100135.csv")
+HS.raw<- read_csv("~/Documents/GitHub/-Econ-5029-data-analysis/RAW_data/Housing start/34100135.csv")
 
 #pivot the data
 HS_pivot <- HS.raw %>% 
   pivot_wider(names_from = `Housing estimates`, values_from = VALUE)
+
 
 #keep only the important variable.
 HS_half_cook <- HS_pivot %>% 
@@ -454,8 +452,8 @@ write.csv(pd, "pd.csv")
 
 #7.0 policy rate cleaning
 ####################################################################################
-
-
+#7.0 The policy rate
+####################################################################################
 policy_rate <- read_csv("policy_rate/policy_rate.csv")
 View(policy_rate)
 
@@ -475,3 +473,9 @@ print(PR_filtered )
 
 
 write.csv(PR_filtered, "PR.csv")
+
+
+
+
+
+

@@ -10,20 +10,25 @@
     #adf.test() for the adf() test
 
 #things I need to do again
+#############################################################
+#Code update record
+############################################################
+#v0.2 Update the meraged code processing and add more data cleaning process.
   
 ############################################################
 rm(list = ls())
 #make sure everthing will be fine.)
 
 #Step one Lode the all package that necessary. 
+#(yes, I just copied it around)
 library (lubridate)    
 library (mFilter)      
 library (neverhpfilter)
 library (tsbox)
-library (RColorBrewer) #so sad they do not have colorful black 
 library(plotly)
 library(wesanderson)
 library(writexl)
+library(cansim)
 library(tidyverse)
 library(readr)
 library(forecast)
@@ -32,6 +37,200 @@ library(ggplot2)
 library(ggthemes)  # For Economist theme
 library(dplyr)
 ############################################################
+#Step one lode the data
+################################################################################
+#The housing price index
+HPI.raw <- read_csv("~/Documents/GitHub/-Econ-5029-data-analysis/Cleaned_data/Presentation_use_data/HPI.csv")
+
+#the housing supply
+NHS.raw  <- read_csv("~/Documents/GitHub/-Econ-5029-data-analysis/Cleaned_data/Presentation_use_data/NHS_na_remover.csv")
+
+#the population data
+pd.raw  <- read_csv("~/Documents/GitHub/-Econ-5029-data-analysis/Cleaned_data/Presentation_use_data/pd.csv")
+
+#The general producer price index 
+
+################################################################################
+
+#OK, What I need to check if the data is working or not? 
+  #what is the frquence? 
+  #Does it seasonal adjust? 
+  #remove the province and keep only the CMA level.
+################################################################################
+#IPPI
+################################################################################
+#Industrial product price index, by major product group, monthly 1, 2
+#(https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=1810026501)
+
+IPPI_raw <- "v1230995983" #Financial market statistics, last Wednesday unless otherwise stated, Bank of Canada, monthly
+IPPI.st <- get_cansim_vector( IPPI_raw, start_time = "1900/01/01")
+IPPI_year.st <- year( IPPI.st$REF_DATE[1])
+IPPI_month.st <- month( IPPI.st$REF_DATE[1])
+c(IPPI_year.st,  IPPI_month.st)
+
+IPPI.ts<- ts( IPPI.st$VALUE, start = c( IPPI_year.st,  IPPI_month.st), freq = 12)
+
+autoplot(IPPI.ts) +
+  ylab("Policy rate") +
+  theme_fivethirtyeight() +
+  xlab("Month") +
+  ylab("rate") +
+  ggtitle("Policy rate set by Bank of Canada ") +
+  labs(subtitle = "from 2007 to 2023") +
+  theme(axis.title = element_text())
+
+################################################################################
+#The policy rate
+################################################################################
+PR_raw <- "v122530" #Financial market statistics, last Wednesday unless otherwise stated, Bank of Canada, monthly
+PR.st <- get_cansim_vector( PR_raw, start_time = "1900/01/01")
+PR_year.st <- year( PR.st$REF_DATE[1])
+PR_month.st <- month( PR.st$REF_DATE[1])
+c(PR_year.st,  PR_month.st)
+
+PR.ts<- ts( PR.st$VALUE, start = c( PR_year.st,  PR_month.st), freq = 12)
+
+
+autoplot(PR.ts) +
+  ylab("Policy rate") +
+  theme_fivethirtyeight() +
+  xlab("Month") +
+  ylab("rate") +
+  ggtitle("Policy rate set by Bank of Canada ") +
+  labs(subtitle = "from 2007 to 2023") +
+  theme(axis.title = element_text())
+
+
+
+################################################################################
+#Now, its the time to processing the list
+################################################################################
+
+# 提取唯一城市名并转换为数据框
+HPI_list <- data.frame(GEO = unique(HPI.raw$GEO))
+NHS_list <- data.frame(GEO = unique(NHS.raw$GEO))
+pd_list <- data.frame(GEO = unique(pd.raw$GEO))
+
+# 合并三个数据框，按GEO列合并
+combined_list <- reduce(list(HPI_list, NHS_list, pd_list), full_join, by = "GEO")
+
+# 输出为 Excel 文件
+write.xlsx(combined_list, "combined_list.xlsx")
+
+#lode the cleaned dictionary 
+dictnoray <- read_excel("combined_list.xlsx")
+
+#note you need to keep the following:
+  #extracked the CMA
+  #extracked the Canada
+
+#remove the dictonary that is empty in the post_cost 
+list_clean <- dictnoray %>% 
+  mutate(Post_code = ifelse(GEO == "Canada", "CA", Post_code),
+         Post_code = ifelse(GEO == "Canada", "CA", Post_code) 
+
+#remove the empty (whitch is not the city)
+list_clean <- list_clean %>% na.omit()
+
+
+################################################################################
+#####1.Some smaller cleaning
+################################################################################
+
+#########
+#The housing price index
+HPI <- HPI.raw  %>% select("REF_DATE" , "GEO" , "Total" , "House", "Land")
+
+#left join the HPI with the dictonary
+HPI <- HPI %>% 
+  left_join(list_clean, by = "GEO")
+
+#filter out the empty post_code 
+HPI <- HPI %>% 
+  filter(!is.na(Post_code))
+
+#create a new_row called the CMA
+
+##########
+#####
+#pick the correct variable
+NHS <- NHS.raw %>% 
+  select(REF_DATE, GEO, Total_units, Single_detached_units, Semi_detached_unitsn, Row_units, Apartment_and_other_units) %>% 
+  rename(Semi_detached_units = Semi_detached_unitsn)
+
+#left join the NHS  with the dictonary
+NHS  <- NHS  %>% 
+  left_join(list_clean, by = "GEO")
+
+#filter out the empty post_code 
+NHS <- NHS %>% 
+  filter(!is.na(Post_code))
+
+#combine those together
+NHS_HPI <- NHS %>% 
+  left_join(HPI, by = c("Post_code", "REF_DATE"))
+#####
+#now its the time to processing the population data 
+pd.ts <- ts(pd.raw, frequency = 1 , from = min(Ref_date), to = max(Ref-date) )
+
+
+#####
+PR_m <- PR.raw  %>%
+  mutate(REF_DATE = format(REF_DATE, "%Y-%m")) %>%  
+  group_by(REF_DATE) %>%
+  summarise(Policy_Rate = mean(VALUE, na.rm = TRUE))
+
+#####
+NHS <- NHS.raw   %>% 
+  select(REF_DATE, GEO, Total_units)
+
+###
+pd <- pd.raw  %>%
+  select(REF_DATE, GEO, VALUE)
+
+
+
+################################################################################
+#1.1rename_the_variable
+################################################################################
+#PR_m
+
+NHS <- NHS %>%
+  rename(housing_supply = Total_units)
+
+pd <- pd %>% 
+  rename(populaton = VALUE)
+
+HPI <- HPI %>% 
+  rename(Total_HPI = Total,
+         House_HPI = House,
+         Land_HPI = Land)
+
+# Change the row name "Census metropolitan areas and census agglomerations of 50,000 and over" to "Canada"
+NHS <- NHS %>%
+  mutate(GEO = ifelse(GEO == "Census metropolitan areas and census agglomerations of 50,000 and over", 
+                      "Canada", GEO))
+
+# Display the updated dataset
+print(NHS)
+
+
+print(unique(NHS$GEO))
+
+print(unique(pd $GEO))
+print(unique(HPI$GEO))
+
+################################################################################
+#2. I came up with the better code, so ignore the folwing code 
+################################################################################
+
+
+
+
+
+
+
+
 #1.Date processing
   #1.1. stationary the data
   #1.2. stationary check
@@ -42,7 +241,7 @@ library(dplyr)
   #2.2. Log-difference regression
   #2.3. autoregressive distributed lag (ARDL) model
 ############################################################
-
+v1230995983
 #load the data
 raw <- read_csv("Code/Cleaned_data/Presentation_use_data/presentation_data_update.csv")
 
@@ -281,4 +480,61 @@ ggplot(df_estimates, aes(x = City, y = Estimate, fill = Estimate)) +
   )
 
 #####################
+
+#Its the time to merge! 
+
+rm(list = ls())
+#make sure everthing will be fine.)
+
+#Step one Lode the all package that necessary. 
+library (lubridate)    
+library (cansim)       
+library (OECD)        
+library (WDI)          
+library (fredr)        
+library (mFilter)      
+library (neverhpfilter)
+library (tsbox)
+library (RColorBrewer) #so sad they do not have colorful black 
+library(plotly)
+library(wesanderson)
+library(writexl)
+library(tidyverse)
+library(readr)
+library(stringr)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
