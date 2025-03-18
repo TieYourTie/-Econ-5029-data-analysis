@@ -40,6 +40,13 @@ library(readxl)
 library(dplyr)
 library(tidyr)
 library(zoo)
+library(tseries)  # This package helps us run the ADF test to check if data is stationary
+library(purrr)    # This package helps us apply functions to multiple variables quickly
+
+#estimate of the elaststic, by the same type.
+#by the ranking of the vase, by the ranking of the each type? 
+#The impose function 
+#becare here, the impose of the respond, you are looking at the resona. 
 
 ############################################################
 #Step one lode the data
@@ -123,7 +130,7 @@ autoplot(PR.ts) +
 #write.xlsx(combined_list, "combined_list.xlsx")
 
 #lode the cleaned dictionary 
-dictnoray <- read_excel("combined_list.xlsx")
+dictnoray <- read_excel("~/Documents/GitHub/-Econ-5029-data-analysis/combined_list.xlsx")
 
 #note you need to keep the following:
   #extracked the CMA
@@ -138,10 +145,7 @@ list_clean <- list_clean %>% na.omit()
 
 
 ################################################################################
-#####1.Some smaller cleaning
-################################################################################
-
-#########
+#####1.Some smaller cleaning###################################################
 #The housing price index
 HPI <- HPI.raw  %>% select("REF_DATE" , "GEO" , "Total" , "House", "Land")
 
@@ -175,8 +179,8 @@ NHS_HPI <- NHS %>%
   left_join(HPI, by = c("Post_code", "REF_DATE"))
 
 ################################################################################
-#the population data organized
-################################################################################
+
+#########the population data organized########################################
 
 #choice the variable
 pd <- pd.raw %>% select("REF_DATE", "GEO" , "VALUE")
@@ -237,398 +241,225 @@ pd_monthly <- pd_monthly %>% rename("population" = "VALUE")
 ##combine those together
 NHS_HPI_pd <- NHS_HPI_ts  %>% 
   left_join(pd_monthly, by = c("Post_code", "REF_DATE"))
+####add IPPI and policy rate####################################################
+################################################################################
+# IPPI.ts and # PR.ts
+
+IPPI <- IPPI.st %>% 
+  select(REF_DATE, VALUE)
+
+#rename the variable
+IPPI <- IPPI %>% 
+  rename("IPPI" = "VALUE" )
+
+# Convert REF_DATE to yearmon format
+IPPI <- IPPI %>%
+  mutate(REF_DATE = as.yearmon(REF_DATE, format = "%Y-%m-%d"))
+
+#The policy rate
+PR <- PR.st %>% 
+  select(REF_DATE, VALUE)
+
+#rename the variable
+PR <- PR %>% 
+  rename( "PR" = "VALUE")
+
+# Convert REF_DATE to yearmon format
+PR <- PR %>%
+  mutate(REF_DATE = as.yearmon(REF_DATE, format = "%Y-%m-%d"))
+
+#left_join time!
+PR_IPPI <- left_join(PR,IPPI,  by = "REF_DATE")
+
+#remove the missing value 
+PR_IPPI <- PR_IPPI %>% na.omit(PR_IPPI)
 
 
+# Merge IPPI and PR with wow_data
+NHS_HPI_pd <-NHS_HPI_pd%>%
+  left_join(PR_IPPI, by = "REF_DATE") 
+
+# Check results
+head(NHS_HPI_pd)
 
 
+####Further clearn the data#####################################################
 
-#combine those together
-NHS_HPI_pd <- NHS_HPI %>% 
-  left_join(pd_monthly, by = c("Post_code", "REF_DATE"))
+#remove the region name
+all_data <- NHS_HPI_pd %>%
+  filter(!is.na(Post_code))
+
+all_data <- all_data %>%
+  filter(!is.na(Total_units) & 
+           !is.na(Single_detached_units) & 
+           !is.na(Semi_detached_units) & 
+           !is.na(Row_units) & 
+           !is.na(Apartment_and_other_units))
+
+all_data <- all_data %>%
+  filter(!is.na(Total) & 
+           !is.na(House) & 
+           !is.na(Land))
+
+all_data <- all_data %>%
+  filter(!is.na(PR) & 
+           !is.na(IPPI) )
 
 
+####Add the growth rate in the log form##########################################
 
+#doing all the log transfermation for the data 
 
-
-
-/
-# Display the result
-print(pd_monthly, n = 24)  # Show first 24 rows
-
-
-
-#
-pd <- pd %>%
-  mutate(REF_DATE = year(REF_DATE))  
-
-
-##########
-pd_month <- pd %>%
-  slice(rep(1:n(), each = 12)) %>%
+# Apply HP filter to log-transformed variables
+wow_data <- all_data %>%
+  group_by(Post_code) %>%
   mutate(
-    Month = rep(1:12, times = nrow(pd)),  # Repeat months 1-12 for each row
-    REF_DATE = as.Date(paste0(format(REF_DATE, "%Y"), "-", Month, "-01"))  # Create proper Date format
+    log_Total_HPI = if_else(Total > 0, log(Total), 0),  
+    Log_House_HPI = if_else(House > 0, log(House), 0),
+    Log_Land_HPI = if_else(Land > 0, log(Land), 0),
+    Log_Total_units_Supply = if_else(Total_units > 0, log(Total_units), 0),  
+    Log_Single_detached_units = if_else(Single_detached_units > 0, log(Single_detached_units), 0),
+    Log_Semi_detached_units = if_else(Semi_detached_units > 0, log(Semi_detached_units), 0),
+    Log_Row_units = if_else(Row_units > 0, log(Row_units), 0),
+    Log_Apartment_and_other_units = if_else(Apartment_and_other_units > 0, log(Apartment_and_other_units), 0)
   ) 
 
 
-#####
-PR_m <- PR.raw  %>%
-  mutate(REF_DATE = format(REF_DATE, "%Y-%m")) %>%  
-  group_by(REF_DATE) %>%
-  summarise(Policy_Rate = mean(VALUE, na.rm = TRUE))
-
-#####
-NHS <- NHS.raw   %>% 
-  select(REF_DATE, GEO, Total_units)
-
-###
-pd <- pd.raw  %>%
-  select(REF_DATE, GEO, VALUE)
-
-
-
 ################################################################################
-#1.1rename_the_variable
-################################################################################
-#PR_m
-
-NHS <- NHS %>%
-  rename(housing_supply = Total_units)
-
-pd <- pd %>% 
-  rename(populaton = VALUE)
-
-HPI <- HPI %>% 
-  rename(Total_HPI = Total,
-         House_HPI = House,
-         Land_HPI = Land)
-
-# Change the row name "Census metropolitan areas and census agglomerations of 50,000 and over" to "Canada"
-NHS <- NHS %>%
-  mutate(GEO = ifelse(GEO == "Census metropolitan areas and census agglomerations of 50,000 and over", 
-                      "Canada", GEO))
-
-# Display the updated dataset
-print(NHS)
+#now its the time to cute the data base 
 
 
-print(unique(NHS$GEO))
+# Split data by Post_code
+unique_post_codes <- unique(wow_data$Post_code)
 
-print(unique(pd $GEO))
-print(unique(HPI$GEO))
-
-################################################################################
-#2. I came up with the better code, so ignore the folwing code 
-################################################################################
+# Store each Post_code's data in a list
+post_code_data <- split(wow_data, wow_data$Post_code)
 
 
 
 
 
-
-
-
-#1.Date processing
-  #1.1. stationary the data
-  #1.2. stationary check
-    #1.2.1 ADF test 
-    #1.2.2 union root test 
-#2. the following method will be used in the code file 
-  #2.1. De-trend log value
-  #2.2. Log-difference regression
-  #2.3. autoregressive distributed lag (ARDL) model
-############################################################
-v1230995983
-#load the data
-raw <- read_csv("Code/Cleaned_data/Presentation_use_data/presentation_data_update.csv")
-
-#check the data
-View(presentation_data_update)
-
-#further data cleaning
-regions_to_remove <- c("Atlantic Region", "Region", "Newfoundland and Labrador", "Prince Edward Island", 
-                       "Nova Scotia", "New Brunswick", "Quebec", "Ontario", "Prairie Region",
-                       "Manitoba", "Saskatchewan", "Alberta", "British Columbia")
-
-#filter out the data that is not city 
-data <- raw %>% filter(!(GEO %in% regions_to_remove))
-
-# Calculate log and change rates, handling zero values
-graphy_wow <- data %>%
-  group_by(GEO) %>%
-  mutate(
-    log_Total_HPI = if_else(Total_HPI > 0, log(Total_HPI), NA_real_),  # Avoid log(0), ensure numeric consistency
-    log_Housing_Supply = if_else(housing_supply > 0, log(housing_supply), NA_real_),  # Avoid log(0)
-    HPI_change_rate = if_else(lag(Total_HPI, default = NA_real_) > 0, 
-                              (Total_HPI - lag(Total_HPI, default = NA_real_)) / lag(Total_HPI, default = NA_real_), 
-                              NA_real_),  # Change rate, avoid division by zero
-    housing_supply_change_rate = if_else(lag(housing_supply, default = NA_real_) > 0, 
-                                         (housing_supply - lag(housing_supply, default = NA_real_)) / lag(housing_supply, default = NA_real_), 
-                                         NA_real_)  # Same here
-  ) %>%
-  ungroup()  # Ensure no unexpected behavior from grouping
-
-#check if the result be better? 
-#no
-############################################################
-#transfer the data into the standard time-series data
-#test run###################################################
-
-
-#Take out the national data
-national_level <- graphy_wow %>% filter(GEO == "Sudbury")
-
-#transfer it into the time series data
-nl <- national_level %>%
-  mutate(REF_DATE = as.yearmon(REF_DATE, format = "%Y-%m"))
-
-#remove the na part
-nl <- nl %>% filter(!is.na(Total_HPI) & !is.na(housing_supply))
-
-#transfer it into the time series data
-nl$log_Housing_Supply <- ts(nl$log_Housing_Supply, start = c(year(min(nl$REF_DATE)), month(min(nl$REF_DATE))), frequency = 12)
-nl$ts_total_hpi <- ts(nl$log_Total_HPI, start = c(year(min(nl$REF_DATE)), month(min(nl$REF_DATE))), frequency = 12)
-
-
-#check the seasonality
-#ggseasonplot(nl$log_Housing_Supply, year.labels = TRUE, year.labels.left = TRUE) +
- # ggtitle("Seasonal Plot of log_Housing_Supply") +
- # ylab("log_Housing_Supply") +
- # theme_minimal()
-
-#ggseasonplot(nl$ts_total_hpi, year.labels = TRUE, year.labels.left = TRUE) +
- # ggtitle("Seasonal Plot of log_Total_HPI") +
- # ylab("log_Total_HPI") +
-  #theme_minimal()
-
-
-#conclution: there is no seasonality within the this datasheet
-#######################################################################
-#plot the ACF graphy
-
-#check the result
-#checkresiduals(nl$log_Total_HPI, lag.max = 100) + ggtitle("")
-#checkresiduals(nl$log_Housing_Supply, lag.max = 100) + ggtitle("")
-
-#conclution: the data is not stationaied
-#now, its the time to apply the first time difference 
-
-nl.sd <- nl %>% 
-  select(REF_DATE, log_Total_HPI,log_Housing_Supply )
-
-#take the data out for the difference
-nl.sd.housing <- nl.sd %>% 
-  select(REF_DATE, log_Housing_Supply )
-
-#take the data out for the difference
-nl.sd.hpi <- nl.sd %>% 
-  select(REF_DATE, log_Total_HPI )
-
-#difference
-nl_sd_houing_twice <- diff(nl.sd.housing$log_Housing_Supply, lag = 1)
-nl_sd_hpi_twice  <- diff(nl.sd.hpi$log_Total_HPI, lag = 1)
-
-#check the residual 
-checkresiduals(nl_sd_houing_twice)
-checkresiduals(nl_sd_hpi_twice)
-
-#run ADF test, its the stationary now! 
-adf.test(nl_sd_houing_twice)
-adf.test(nl_sd_hpi_twice)
-
-
-# Ensure both series have the same length after differencing
-min_length <- min(length(nl_sd_houing_twice), length(nl_sd_hpi_twice))
-
-# Create a time series dataframe
-data_ts <- ts(data.frame(
-  housing = nl_sd_houing_twice[1:min_length],
-  hpi = nl_sd_hpi_twice[1:min_length]
-), start = start(nl_sd_houing_twice), frequency = frequency(nl_sd_houing_twice))
-
-# Check the structure
-head(data_ts)
-
-
-# Fit the time series linear model
-model <- tslm(housing ~ 0 + hpi, data = data_ts)
-
-# View the model summary
-summary(model)
-#function####################################
-
-
-estimate_tslm_by_region <- function(data) {
-  # Get the unique list of GEO regions
-  unique_regions <- unique(data$GEO)
+# This function will check if each variable is stationary, and if it's not, it will take the first difference to make it stationary.
+# It also makes sure to keep the REF_DATE (date) and Post_code (location) so we don’t lose track of what’s happening.
+make_stationary_with_date <- function(data, variables) {
   
-  # Initialize an empty vector to store coefficients
-  estimates <- numeric(length(unique_regions))
-  
-  # Loop through each GEO region
-  for (i in seq_along(unique_regions)) {
-    region <- unique_regions[i]
-    
-    # Filter data for the current region
-    region_data <- data %>% filter(GEO == region)
-    
-    # Convert REF_DATE to year-month format
-    region_data <- region_data %>%
-      mutate(REF_DATE = as.yearmon(REF_DATE, format = "%Y-%m"))
-    
-    # Remove rows with NA values
-    region_data <- region_data %>%
-      filter(!is.na(Total_HPI) & !is.na(housing_supply))
-    
-    # Convert log-transformed variables into time series
-    region_data$log_Housing_Supply <- ts(region_data$log_Housing_Supply, 
-                                         start = c(year(min(region_data$REF_DATE)), month(min(region_data$REF_DATE))), 
-                                         frequency = 12)
-    
-    region_data$ts_total_hpi <- ts(region_data$log_Total_HPI, 
-                                   start = c(year(min(region_data$REF_DATE)), month(min(region_data$REF_DATE))), 
-                                   frequency = 12)
-    
-    # Select relevant columns
-    region_ts <- region_data %>% select(REF_DATE, log_Total_HPI, log_Housing_Supply)
-    
-    # Difference the time series to ensure stationarity
-    housing_diff <- diff(region_ts$log_Housing_Supply, lag = 1)
-    hpi_diff <- diff(region_ts$log_Total_HPI, lag = 1)
-    
-    # Ensure both series have the same length
-    min_length <- min(length(housing_diff), length(hpi_diff))
-    
-    # Create a data frame for time series regression
-    data_ts <- ts(data.frame(
-      housing = housing_diff[1:min_length],
-      hpi = hpi_diff[1:min_length]
-    ), start = start(housing_diff), frequency = frequency(housing_diff))
-    
-    # Run the time series linear model (without intercept)
-    model <- tslm(housing ~  0 + hpi, data = data_ts)
-    
-    # Extract the coefficient estimate for hpi
-    estimates[i] <- coef(model)["hpi"]
+  # First, we make sure the data has the date and post code columns, 
+  # because without them, we won’t know when or where the data is from.
+  if (!all(c("REF_DATE", "Post_code") %in% colnames(data))) {
+    stop("Error: The dataset must have 'REF_DATE' and 'Post_code' columns!")
   }
   
-  # Create a matrix with region names
-  estimate_matrix <- matrix(estimates, nrow = length(unique_regions), dimnames = list(unique_regions, "Estimate"))
+  # We create a new dataset to store the stationary version of the data.
+  # It starts by keeping only the date and location info.
+  stationary_data <- data %>% select(REF_DATE, Post_code)
   
-  # Print the matrix
-  print(estimate_matrix)
+  # We will also keep track of ADF test results so we can check if each variable is stationary or not.
+  adf_results <- list()
   
-  return(estimate_matrix)
+  # Now, we go through each variable in the list and check if it's stationary.
+  for (var in variables) {
+    
+    # If the column isn’t made of numbers (like if it has text), we can’t run the ADF test, 
+    # so we just skip it and show a warning.
+    if (!is.numeric(data[[var]])) {
+      warning(paste("Skipping column:", var, "because it's not numeric!"))
+      next
+    }
+    
+    # Run the ADF test on the variable to see if it's already stationary.
+    test_result <- adf.test(data[[var]], alternative = "stationary")
+    
+    # Save the test results in our list.
+    adf_results[[var]] <- list(
+      "ADF_Stat" = test_result$statistic,  # The test statistic (lower means more stationary)
+      "P_Value" = test_result$p.value,     # The p-value (if it's small, the data is stationary)
+      "Stationary" = test_result$p.value < 0.05  # TRUE if p < 0.05, meaning the data is already stationary
+    )
+    
+    # If the variable is already stationary, we keep it as it is.
+    if (test_result$p.value < 0.05) {
+      stationary_data[[var]] <- data[[var]]
+      
+    } else { 
+      # If the variable is NOT stationary, we take the first difference (subtract each value from the one before).
+      diff_var_name <- paste0("d_", var)  # We rename it with a "d_" to show it's the differenced version.
+      stationary_data[[diff_var_name]] <- c(NA, diff(data[[var]]))  # Take the first difference
+      
+      # Now, we check again if the differenced data is stationary.
+      diff_test_result <- adf.test(na.omit(stationary_data[[diff_var_name]]), alternative = "stationary")
+      
+      # Save the results of this second ADF test.
+      adf_results[[diff_var_name]] <- list(
+        "ADF_Stat" = diff_test_result$statistic,
+        "P_Value" = diff_test_result$p.value,
+        "Stationary" = diff_test_result$p.value < 0.05
+      )
+    }
+  }
+  
+  # Now, we turn our ADF test results into a nice table so we can see which variables are stationary.
+  adf_summary <- tibble(
+    Variable = names(adf_results),
+    ADF_Stat = map_dbl(adf_results, ~ .x$ADF_Stat),
+    P_Value = map_dbl(adf_results, ~ .x$P_Value),
+    Stationary = map_lgl(adf_results, ~ .x$Stationary)
+  )
+  
+  # Finally, we return both the cleaned-up, stationary data AND the ADF test results.
+  return(list("data" = stationary_data, "adf_results" = adf_summary))
 }
 
-# Run the function on graphy_wow dataset
-estimate_matrix <- estimate_tslm_by_region(graphy_wow)
+# List of variables we want to check for stationarity
+variables_to_check <- c("log_Total_HPI", "Log_House_HPI", "Log_Land_HPI", "Log_Total_units_Supply",
+                        "Log_Single_detached_units", "Log_Semi_detached_units", "Log_Row_units",
+                        "PR", "IPPI")
 
-#plot the graphy################################
 
-# Convert the matrix to a dataframe
-df_estimates <- as.data.frame(estimate_matrix)
-df_estimates$City <- rownames(estimate_matrix)
+######################
+# Create a list to store each processed dataset
+stationary_datasets <- list()
+adf_results_list <- list()
 
-# Calculate the national mean and variance
-national_mean <- mean(df_estimates$Estimate)
-national_sd <- sd(df_estimates$Estimate)
+# Get unique post codes
+post_codes <- unique(wow_data$Post_code)
 
-# Sort data from highest to lowest estimate
-df_estimates <- df_estimates %>%
-  arrange(desc(Estimate))
-
-# Convert City to an ordered factor for ggplot
-df_estimates$City <- factor(df_estimates$City, levels = df_estimates$City)
-
-# Create the plot
-ggplot(df_estimates, aes(x = City, y = Estimate, fill = Estimate)) +
-  geom_bar(stat = "identity", color = "black", width = 0.7) +  # Bar chart
-  geom_hline(yintercept = national_mean, linetype = "dashed", color = "red", size = 1.2) + # Mean line
-  geom_hline(yintercept = national_mean + national_sd, linetype = "dotted", color = "blue", size = 1) + # +1 SD
-  geom_hline(yintercept = national_mean - national_sd, linetype = "dotted", color = "blue", size = 1) + # -1 SD
+# Loop through each post code and process data separately
+for (i in post_codes) {
   
-  # Labels for Mean and Standard Deviation
-  annotate("text", x = length(df_estimates$City) - 2, y = national_mean + 0.5, 
-           label = paste0("Mean: ", round(national_mean, 2)), color = "red", hjust = 1) +
-  annotate("text", x = length(df_estimates$City) - 2, y = national_mean + national_sd + 0.5, 
-           label = paste0("+1 SD: ", round(national_mean + national_sd, 2)), color = "blue", hjust = 1) +
-  annotate("text", x = length(df_estimates$City) - 2, y = national_mean - national_sd - 0.5, 
-           label = paste0("-1 SD: ", round(national_mean - national_sd, 2)), color = "blue", hjust = 1) +
+  # Filter the dataset for the current post code
+  data_subset <- post_code_data[[i]]  # This selects the data for the given post code
   
-  # Improve color mapping
-  scale_fill_gradient2(low = "red", mid = "white", high = "darkgreen", midpoint = national_mean) +
+  # Run the stationary processing function on the subset
+  result <- make_stationary_with_date(data_subset, variables_to_check)
   
-  # Apply the Economist theme
-  theme_economist() +
+  # Save the processed dataset in a list using the post code as the key
+  stationary_datasets[[i]] <- result$data
   
-  # Improve text readability
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
-        legend.position = "none",
-        plot.title = element_text(size = 14, face = "bold"),
-        plot.subtitle = element_text(size = 12)) +
+  # Save ADF test results in another list
+  adf_results_list[[i]] <- result$adf_results
   
-  # Labels
-  labs(
-    title = "Estimated Impact of HPI on Housing Supply by City",
-    subtitle = "National mean and variance included",
-    x = "City",
-    y = "Estimated Coefficient"
-  )
+  # Dynamically assign a variable with the post code as the name
+  assign(paste0("stationary_data_", i), result$data)
+}
 
-#####################
+# Print the stored datasets
+print(stationary_datasets)
 
-#Its the time to merge! 
+# Print ADF test results
+print(adf_results_list)
 
-rm(list = ls())
-#make sure everthing will be fine.)
+# Show an example: first few rows of the first dataset
+head(stationary_datasets[[post_codes[1]]])  # Show first dataset processed
 
-#Step one Lode the all package that necessary. 
-library (lubridate)    
-library (cansim)       
-library (OECD)        
-library (WDI)          
-library (fredr)        
-library (mFilter)      
-library (neverhpfilter)
-library (tsbox)
-library (RColorBrewer) #so sad they do not have colorful black 
-library(plotly)
-library(wesanderson)
-library(writexl)
-library(tidyverse)
-library(readr)
-library(stringr)
+save(stationary_datasets, file = "stationary_data.RData")
+#################
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Save each dataset as an .RData file
+for (i in post_codes) {
+  
+  save(stationary_datasets[[i]], file = paste0("stationary_data_", i, ".RData"))
+  
+}
 
 
 
