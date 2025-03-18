@@ -37,7 +37,6 @@ library(ggplot2)
 library(ggthemes)  # For Economist theme
 library(dplyr)
 library(readxl)
-library(dplyr)
 library(tidyr)
 library(zoo)
 library(tseries)  # This package helps us run the ADF test to check if data is stationary
@@ -47,6 +46,7 @@ library(purrr)    # This package helps us apply functions to multiple variables 
 #by the ranking of the vase, by the ranking of the each type? 
 #The impose function 
 #becare here, the impose of the respond, you are looking at the resona. 
+#housing permit 
 
 ############################################################
 #Step one lode the data
