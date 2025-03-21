@@ -57,9 +57,6 @@ clean_column_names <- function(df) {
 
 #######
 
-# Apply function to clean data
-cleaned_data <- clean_column_names(clean$A1A)
-
 #remove all the NA vlaue
 clean <- lapply(stationary_datasets, na.omit)
 
@@ -67,6 +64,48 @@ clean <- lapply(stationary_datasets, na.omit)
 clean_select <- lapply(clean, clean_column_names)
 
 
+# Define the folder where you want to save files
+save_folder <- "clean_data_outputs/"  # Change this to your desired folder
+
+# Create folder if it doesn't exist
+if (!dir.exists(save_folder)) {
+  dir.create(save_folder)
+}
+
+# Save each dataframe as a separate CSV file
+lapply(names(clean_select), function(name) {
+  write.csv(clean_select[[name]], file = paste0(save_folder, name, ".csv"), row.names = FALSE)
+})
+
+# Define the folder where you want to save the RData files
+save_folder <- "clean_data_outputs/"  # Change this to your preferred directory
+
+# Create folder if it doesn't exist
+if (!dir.exists(save_folder)) {
+  dir.create(save_folder)
+}
+
+ungroup(E2H)
+
+E2H.df <- as.data.frame(E2H)
+
+E2H.var <- E2H.df[, !colnames(E2H) %in% c("REF_DATE", "Post_code")]
 
 
+var_selection <- VARselect(E2H, lag.max = 10)
+
+
+# Estimate the VAR model with different lags
+var_selection <- VARselect(E2H.var, lag.max = 10)
+
+# View the suggested lags
+print(var_selection)
+
+
+optimal_lag <- var_selection$selection["AIC(n)"]  # Change "AIC(n)" to "BIC(n)" if preferred
+
+# Fit the VAR model
+var_model <- VAR(E2H.var, p = optimal_lag)
+
+summary(var_model)
 
