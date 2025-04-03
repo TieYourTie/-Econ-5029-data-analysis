@@ -9,13 +9,20 @@
     #using checkresiduals() for check the residual
     #adf.test() for the adf() test
 
+
 #things I need to do again
 #############################################################
 #Code update record
 ############################################################
 #v0.2 Update the meraged code processing and add more data cleaning process.
 #v0.3 now this data set including the housing permit
+#v0.4 update the part of log-log difference
+#v0.5 futher clean the code.
 ############################################################
+
+###############################################################################
+#Lode the package
+###############################################################################
 rm(list = ls())
 #make sure everthing will be fine.)
 
@@ -43,9 +50,9 @@ library(tseries)  # This package helps us run the ADF test to check if data is s
 library(purrr)    # This package helps us apply functions to multiple variables quickly
 
 
-############################################################
+###############################################################################
 #Step one lode the data
-################################################################################
+###############################################################################
 #note: the policy rate and population data has been added in this dataset by using the cansim
 #wow
 
@@ -62,29 +69,33 @@ pd.raw  <- read_csv("~/Documents/GitHub/-Econ-5029-data-analysis/Cleaned_data/Pr
 Housing_permit_one<- read_csv("~/Documents/GitHub/-Econ-5029-data-analysis/Cleaned_data/Housing_permit_all_cleaned.csv")
 
 #
-################################################################################
-#Now, its the time to processing the list
-################################################################################
+###############################################################################
+#Processing the dictnoary
+###############################################################################
+#note: this section was design to create a dictnoary so we can
+#aline all the data togther etter
 
-# 提取唯一城市名并转换为数据框
+#take out the list from the data
 #HPI_list <- data.frame(GEO = unique(HPI.raw$GEO))
 #NHS_list <- data.frame(GEO = unique(NHS.raw$GEO))
 #pd_list <- data.frame(GEO = unique(pd.raw$GEO))
 
-# 合并三个数据框，按GEO列合并
+#combine it togther
 #combined_list <- reduce(list(HPI_list, NHS_list, pd_list), full_join, by = "GEO")
 
-# 输出为 Excel 文件
+#export it as exce.
 #write.xlsx(combined_list, "combined_list.xlsx")
 
-#lode the cleaned dictionary 
+#note: after the mannally add the things
+#then add it back 
+#lode the cleaned dictionary
 dictnoray <- read_excel("~/Documents/GitHub/-Econ-5029-data-analysis/combined_list.xlsx")
 
 #note you need to keep the following:
 #extracked the CMA
 #extracked the Canada
 
-
+#Further adjust for the dictnory.
 # Remove empty dictionaries in Post_code
 list_clean <- dictnoray %>%
   mutate(Post_code = case_when(
@@ -110,21 +121,27 @@ list_clean <- dictnoray %>%
   ))
 
 
-
-
-
 #remove the empty (whitch is not the city)
 list_clean <- list_clean %>% na.omit()
 
 
+
 ################################################################################
-#Clean the housing permit data##################################################
+#Clean the housing permit data
+################################################################################
+#
+# Table 34100007 - Building permits, dwelling units by type of structure, monthly - *Terminated*
+# This table contains 1597 series, with data for Jan-1976 - Dec-2017 (not all combinations necessarily have data for all time periods), and was released on 08-Mar-2018.
+# This table contains data described by the following dimensions (Not all combinations are available):
+# Geography (116 items: Canada; Newfoundland and Labrador; Avalon Peninsula, Newfoundland and Labrador; South Coast-Burin Peninsula, Newfoundland and Labrador; Notre Dame-Central Bonavista Bay, Newfoundland and Labrador; ...)
+# Type of structure (15 items: Total dwellings; Singles, includes mobile homes; Cottages; Doubles; Rows; ...)
+
 
 #keep only the variables that matter 
 Housing_permit_2017 <- Housing_permit_one %>% 
   select(REF_DATE, GEO, Residential)
 
-#remove the row that is empty in the residental.
+#remove the row that is empty in the residential.
 HP <- Housing_permit_2017 %>% 
   left_join(list_clean, by = "GEO")
 
@@ -132,20 +149,10 @@ HP <- Housing_permit_2017 %>%
 HP <- HP %>% 
   filter(!is.na(Post_code))
 
-#filter_out_the_empty_residentaial 
-HP <- HP %>% 
-  filter(!is.na(Residential))
-
 #rename the variable 
 HP <- HP %>%
   rename("HP_Residential" = "Residential" )
 
-################################################################################
-
-#OK, What I need to check if the data is working or not? 
-  #what is the frquence? 
-  #Does it seasonal adjust? 
-  #remove the province and keep only the CMA level.
 ################################################################################
 #IPPI
 ################################################################################
@@ -162,74 +169,8 @@ IPPI.ts<- ts( IPPI.st$VALUE, start = c( IPPI_year.st,  IPPI_month.st), freq = 12
 
 
 ################################################################################
-#The policy rate
+#the population data organized (Removed)
 ################################################################################
-PR_raw <- "v122530" #Financial market statistics, last Wednesday unless otherwise stated, Bank of Canada, monthly
-PR.st <- get_cansim_vector( PR_raw, start_time = "1900/01/01")
-PR_year.st <- year( PR.st$REF_DATE[1])
-PR_month.st <- month( PR.st$REF_DATE[1])
-c(PR_year.st,  PR_month.st)
-
-PR.ts<- ts( PR.st$VALUE, start = c( PR_year.st,  PR_month.st), freq = 12)
-
-
-autoplot(PR.ts) +
-  ylab("Policy rate") +
-  theme_fivethirtyeight() +
-  xlab("Month") +
-  ylab("rate") +
-  ggtitle("Policy rate set by Bank of Canada ") +
-  labs(subtitle = "from 2007 to 2023") +
-  theme(axis.title = element_text())
-
-
-
-
-
-################################################################################
-#####1.Some smaller cleaning###################################################
-#The housing price index
-HPI <- HPI.raw  %>% select("REF_DATE" , "GEO" , "Total" , "House", "Land")
-
-#left join the HPI with the dictonary
-HPI <- HPI %>% 
-  left_join(list_clean, by = "GEO")
-
-#filter out the empty post_code 
-HPI <- HPI %>% 
-  filter(!is.na(Post_code))
-
-#create a new_row called the CMA
-
-###############################
-#pick the correct variable
-NHS <- NHS.raw %>% 
-  select(REF_DATE, GEO, Total_units, Single_detached_units, Semi_detached_unitsn, Row_units, Apartment_and_other_units) %>% 
-  rename(Semi_detached_units = Semi_detached_unitsn)
-
-#left join the NHS  with the dictonary
-NHS  <- NHS  %>% 
-  left_join(list_clean, by = "GEO")
-
-#filter out the empty post_code 
-NHS <- NHS %>% 
-  filter(!is.na(Post_code))
-
-#combine those together
-NHS_HPI <- NHS %>% 
-  left_join(HPI, by = c("Post_code", "REF_DATE"))
-
-
-#add the housing permit data 
-NHS_HPI_HP <- NHS_HPI %>%
-  left_join(HP, by = c("Post_code", "REF_DATE"))
-
-
-
-################################################################################
-
-#########the population data organized########################################
-# 
 # #choice the variable
 # pd <- pd.raw %>% select("REF_DATE", "GEO" , "VALUE")
 # 
@@ -260,6 +201,67 @@ NHS_HPI_HP <- NHS_HPI %>%
 # 
 
 ################################################################################
+#The policy rate
+################################################################################
+#Financial market statistics, last Wednesday unless otherwise stated, Bank of Canada, monthly
+PR_raw <- "v122530" 
+PR.st <- get_cansim_vector( PR_raw, start_time = "1900/01/01")
+PR_year.st <- year( PR.st$REF_DATE[1])
+PR_month.st <- month( PR.st$REF_DATE[1])
+c(PR_year.st,  PR_month.st)
+
+PR.ts<- ts( PR.st$VALUE, start = c( PR_year.st,  PR_month.st), freq = 12)
+
+autoplot(PR.ts) +
+  ylab("Policy rate") +
+  theme_fivethirtyeight() +
+  xlab("Month") +
+  ylab("rate") +
+  ggtitle("Policy rate set by Bank of Canada ") +
+  labs(subtitle = "from 2007 to 2023") +
+  theme(axis.title = element_text())
+
+################################################################################
+#Combine data with dictionary
+################################################################################
+#The housing price index
+HPI <- HPI.raw  %>% select("REF_DATE" , "GEO" , "Total" , "House", "Land")
+
+#left join the HPI with the dictonary
+HPI <- HPI %>% 
+  left_join(list_clean, by = "GEO")
+
+#filter out the empty post_code 
+HPI <- HPI %>% 
+  filter(!is.na(Post_code))
+
+#create a new_row called the CMA
+
+################################################################################
+##combine the new housing supply with the housing permit
+################################################################################
+NHS <- NHS.raw %>% 
+  select(REF_DATE, GEO, Total_units, Single_detached_units, Semi_detached_unitsn, Row_units, Apartment_and_other_units) %>% 
+  rename(Semi_detached_units = Semi_detached_unitsn)
+
+#left join the NHS  with the dictonary
+NHS  <- NHS  %>% 
+  left_join(list_clean, by = "GEO")
+
+#filter out the empty post_code 
+NHS <- NHS %>% 
+  filter(!is.na(Post_code))
+
+#combine those together
+NHS_HPI <- NHS %>% 
+  left_join(HPI, by = c("Post_code", "REF_DATE"))
+
+
+#add the housing permit data 
+NHS_HPI_HP <- NHS_HPI %>%
+  left_join(HP, by = c("Post_code", "REF_DATE"))
+
+
 # #the time for the left join
 # pd_monthly <- pd_monthly %>% 
 #   left_join(list_clean, by = "GEO")
@@ -291,10 +293,9 @@ NHS_HPI_HP_ts <- NHS_HPI_HP %>%
 
 
 
-####add IPPI and policy rate####################################################
 ################################################################################
-# IPPI.ts and # PR.ts
-
+#add IPPI and policy rate
+################################################################################
 IPPI <- IPPI.st %>% 
   select(REF_DATE, VALUE)
 
@@ -333,7 +334,9 @@ NHS_HPI_HP_PR_IPPI <-NHS_HPI_HP_ts%>%
 head(NHS_HPI_HP_PR_IPPI)
 
 
-####Further clearn the data#####################################################
+################################################################################
+#Further clearn the data
+################################################################################
 
 #remove the region name
 all_data <- NHS_HPI_HP_PR_IPPI %>%
@@ -356,8 +359,9 @@ all_data <- all_data %>%
            !is.na(IPPI) )
 
 
-####Add the growth rate in the log form##########################################
 
+#log the value
+################################################################################
 # #doing all the log transfermation for the data 
 # all_data <- all_data %>%
 #   rename("population" = "VALUE")
@@ -379,10 +383,79 @@ wow_data <- all_data %>%
 
 wow_data <- wow_data %>% filter(!is.na(HP_Residential))
 
-
 ###############################################################################
-#remove the unwanted variable ########
+#Try to the log and log?
+###############################################################################
+# # Filter cities with at least 20 observations
+# filtered_data <- wow_data %>%
+#   group_by(Post_code) %>%
+#   filter(n() <= 20) %>%
+#   ungroup()
+# 
+# # Define formulas
+# formulas <- list(
+#   "Single_detached" = Log_House_HPI ~ 0 + Log_Single_detached_units,
+#   "Semi_detached"   = Log_House_HPI ~ 0 + Log_Semi_detached_units,
+#   "Row"             = Log_House_HPI ~ 0 + Log_Row_units,
+#   "Apartment_other" = Log_House_HPI ~ 0 + Log_Apartment_and_other_units
+# )
+# 
+# # Create a dataframe to store coefficients
+# coefficient_df <- data.frame()
+# 
+# # Run regressions
+# for (pc in unique(filtered_data$Post_code)) {
+#   city_data <- filtered_data %>% filter(Post_code == pc)
+#   
+#   for (type in names(formulas)) {
+#     model <- lm(formulas[[type]], data = city_data)
+#     coef_val <- coef(model)[[1]]
+#     
+#     # Save result
+#     coefficient_df <- rbind(coefficient_df, data.frame(
+#       Post_code = pc,
+#       Type = type,
+#       Coefficient = coef_val
+#     ))
+#   }
+# }
+# 
+# 
+# 
+# # Function to plot each type
+# plot_coefficients_by_type <- function(type_name, data) {
+#   df <- data %>% filter(Type == type_name) %>%
+#     arrange(desc(Coefficient))
+#   
+#   avg_coef <- mean(df$Coefficient, na.rm = TRUE)
+#   
+#   ggplot(df, aes(x = reorder(Post_code, Coefficient), y = Coefficient)) +
+#     geom_bar(stat = "identity", fill = "steelblue") +
+#     geom_hline(yintercept = avg_coef, color = "red", linetype = "dashed", linewidth = 1) +
+#     coord_flip() +
+#     labs(
+#       title = paste("Coefficient of", type_name, "Units"),
+#       subtitle = paste("Average Coefficient =", round(avg_coef, 3)),
+#       x = "Post Code (City)",
+#       y = "Log-Log Regression Coefficient"
+#     ) +
+#     theme_minimal()
+# }
+# 
+# # Plot for each type
+# plot_coefficients_by_type("Single_detached", coefficient_df)
+# plot_coefficients_by_type("Semi_detached", coefficient_df)
+# plot_coefficients_by_type("Row", coefficient_df)
+# plot_coefficients_by_type("Apartment_other", coefficient_df)
+# 
 
+
+
+
+
+################################################################################
+#remove the unwanted variable 
+################################################################################
 # Define variables to check
 variables_to_check <- c("log_Total_HPI", "Log_House_HPI", "Log_Land_HPI", "Log_Total_units_Supply",
                         "Log_Single_detached_units", "Log_Semi_detached_units", "Log_Row_units",
@@ -395,73 +468,76 @@ wow_data <- wow_data %>%
 
 
 ################################################################################
-#now its the time to cute the data base 
+#Stationary the data
+################################################################################
 
-# Split data by Post_code
+#take out of the list in the post code
 unique_post_codes <- unique(wow_data$Post_code)
 
 # Store each Post_code's data in a list
 post_code_data <- split(wow_data, wow_data$Post_code)
 
+
 make_stationary_with_date <- function(data, variables) {
   
-  # 确保数据有 REF_DATE 和 Post_code
+  # check if the date and post code
   if (!all(c("REF_DATE", "Post_code") %in% colnames(data))) {
     stop("Error: The dataset must have 'REF_DATE' and 'Post_code' columns!")
   }
   
-  # 创建一个存储平稳数据的数据框
+  # create a list that store the stationary data
   stationary_data <- data %>% select(REF_DATE, Post_code)
   
-  # 记录 ADF 测试结果
+  #create a list for the adf-list
   adf_results <- list()
   
-  # 遍历每个变量
+  #go though every variable
   for (var in variables) {
     
-    # 跳过非数值列
+    #only do the test for number
     if (!is.numeric(data[[var]])) {
       warning(paste("Skipping column:", var, "because it's not numeric!"))
       next
     }
     
-    # 去掉 NA 值后进行 ADF 检验
+    #remove the NA
     clean_var <- na.omit(data[[var]])
     
-    # 如果数据点太少，跳过
+    #if there are not enough data then screaming for warning.
     if (length(clean_var) < 5) {
       warning(paste("Skipping column:", var, "because it has too few non-NA observations!"))
       next
     }
     
-    # 运行 ADF 测试
+    # run the adf test
     test_result <- tryCatch(
       adf.test(clean_var, alternative = "stationary"),
       error = function(e) return(NULL)
     )
     
-    # 如果 ADF 失败，跳过
+    #If the ADF test wrong 
     if (is.null(test_result) || is.na(test_result$p.value)) {
       warning(paste("ADF test failed for variable:", var))
       next
     }
     
-    # 记录原始数据的 ADF 结果
+    # save it
     adf_results[[var]] <- list(
       "ADF_Stat" = test_result$statistic,
       "P_Value" = test_result$p.value,
       "Stationary" = test_result$p.value < 0.05
     )
     
-    # **第一步：检查原始数据是否平稳**
+    # check if the data is stationary
+    # if the things is not stationary
     if (test_result$p.value < 0.05) {
       stationary_data[[var]] <- data[[var]]
     } else {
-      # **计算一阶差分**
+      #then doing the first difference
       d1_var <- paste0("d_", var)
       stationary_data[[d1_var]] <- c(NA, diff(data[[var]]))
       
-      # 检查一阶差分是否足够长
+      #check if the stationary is long enough
       d1_clean_var <- na.omit(stationary_data[[d1_var]])
       if (length(d1_clean_var) >= 5) {
         d1_test_result <- tryCatch(
@@ -470,27 +546,27 @@ make_stationary_with_date <- function(data, variables) {
         )
         
         if (!is.null(d1_test_result) && !is.na(d1_test_result$p.value)) {
-          # 记录一阶差分的 ADF 结果
+          # save the reuslt of the adf
           adf_results[[d1_var]] <- list(
             "ADF_Stat" = d1_test_result$statistic,
             "P_Value" = d1_test_result$p.value,
             "Stationary" = d1_test_result$p.value < 0.05
           )
           
-          # **第二步：检查一阶差分是否平稳**
+          # check the statonary for the adf
           if (d1_test_result$p.value < 0.05) {
-            next  # 如果平稳，跳过后续步骤
+            next 
           }
         } else {
           warning(paste("ADF test failed for first-differenced variable:", d1_var))
         }
       }
       
-      # **计算二阶差分**
+      # calcuate the second difference
       d2_var <- paste0("d2_", var)
       stationary_data[[d2_var]] <- c(NA, NA, diff(data[[var]], differences = 2))
       
-      # 检查二阶差分是否足够长
+      #check the if result of the second stationary is long enough
       d2_clean_var <- na.omit(stationary_data[[d2_var]])
       if (length(d2_clean_var) >= 5) {
         d2_test_result <- tryCatch(
@@ -499,7 +575,7 @@ make_stationary_with_date <- function(data, variables) {
         )
         
         if (!is.null(d2_test_result) && !is.na(d2_test_result$p.value)) {
-          # 记录二阶差分的 ADF 结果
+          # result in the second section
           adf_results[[d2_var]] <- list(
             "ADF_Stat" = d2_test_result$statistic,
             "P_Value" = d2_test_result$p.value,
@@ -512,7 +588,7 @@ make_stationary_with_date <- function(data, variables) {
     }
   }
   
-  # 整理 ADF 结果
+  # organized the adf result 
   adf_summary <- tibble(
     Variable = names(adf_results),
     ADF_Stat = map_dbl(adf_results, ~ .x$ADF_Stat),
@@ -520,7 +596,7 @@ make_stationary_with_date <- function(data, variables) {
     Stationary = map_lgl(adf_results, ~ .x$Stationary)
   )
   
-  # 返回数据和 ADF 结果
+  #out put the ADF result.
   return(list("data" = stationary_data, "adf_results" = adf_summary))
 }
 
@@ -530,7 +606,12 @@ variables_to_check <- c("log_Total_HPI", "Log_House_HPI", "Log_Land_HPI", "Log_T
                         "PR", "IPPI", "log_HP_Residential")
 
 
-######################
+
+
+################################################################################
+#Save the result 
+################################################################################
+
 # Create a list to store each processed dataset
 stationary_datasets <- list()
 adf_results_list <- list()
