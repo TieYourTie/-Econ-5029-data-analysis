@@ -1,0 +1,188 @@
+---
+title: "Econ 5880W"
+output: html_document
+date: "2025-03-24"
+---
+
+```{r setup, include=FALSE}
+##########################################################################
+#clean the envorient######################################################
+rm(list = ls())
+#note: I just copied it around...
+library (lubridate)     #the time series processing package
+library (tsbox)         #Make time series convverstion, aggregation and plotting simple
+library (RColorBrewer)  #color palettes for R graphics
+library(wesanderson)    #Provides color palettes inspired by Wes Anderson films.
+library(writexl)        #Writes data frames to Excel files.
+library(tidyr)          #Tidies messy data   
+library(xts)            #Extensible time series class for R   
+library(dplyr)          #Data manipulation and transformation.
+library(openxlsx)       #Read, write, and edit Excel files.
+library(haven)          #the package can able lode the stata file
+library(readr)
+##########################################################################
+
+```
+
+```{r}
+#lode the data############################################################
+raw<- read_csv("Google Drive/我的云端硬盘/Mac things/2025 winter/Econ 5880W/Econ 5880 assisgnment two/ck_data.csv")
+
+#check the data 
+print(unique(raw$time))
+#gooooood
+
+#since the data is cleaned, I will just do na.omit
+raw <- na.omit(raw)
+
+```
+
+
+```{r}
+##########################################################################
+###Data_cleaning##########################################################
+
+#Q-B
+
+#PA before
+PA_before <- raw %>% filter(time == "Feb-92", state == "PA")
+
+#calculate the average employment
+PA_before_AE <- mean(PA_before$emp)
+
+#PA After 
+PA_after <- raw %>% filter(time == "Nov-92", state == "PA")
+
+#calculate the average employment
+PA_after_AE <- mean(PA_after$emp)
+
+#NJ before
+NJ_before <- raw %>% filter(time == "Feb-92", state == "NJ")
+
+#calculate the average employment
+NJ_before_AE <- mean(NJ_before$emp)
+
+#NJ After 
+NJ_after <- raw %>% filter(time == "Nov-92", state == "NJ")
+
+#calculate the average employment
+NJ_after_AE <- mean(NJ_after$emp)
+  
+#its the DiD time! 
+DiD <- (NJ_after_AE - NJ_before_AE) - (PA_after_AE - PA_before_AE)
+
+#print the result 
+print(DiD)
+#3.168648
+
+##this means the increase of the minmal wage acutally increase the empolymented by 3.16 person
+#or 3 person with some flash.
+
+```
+
+```{r}
+#Q2d###########################################################################
+
+#clean the enviroment
+rm(list = ls())
+
+#lode the data 
+raw<- read_csv("Google Drive/我的云端硬盘/Mac things/2025 winter/Econ 5880W/Econ 5880 assisgnment two/ck_data.csv")
+
+
+#since the data is cleaned, I will just do na.omit
+raw <- na.omit(raw)
+
+#note: the following code are ideal from 
+"Difference in Difference using R by Oscar Torres- Reyna, https://www.princeton.edu/~otorres/DID101R.pdf"
+#As there is no sample code provide by professor. 
+
+#step one
+#create a dummy variable to indicate the time when the treatment started. 
+#base on the question the treatment happened in the April 1, 1992
+evil <- na.omit(raw)
+
+evil$time <- ifelse(raw$time == "Feb-92", 0, 1)
+
+#step two
+#create a dummy variable to identify the group exposed to the treate.
+#base on the question NJ is been treaded and PA is not.
+
+evil$treated <- ifelse(raw$state == "PA", 0, 1)
+
+
+#step three
+#create an interaction between time and treated, we will called this interaction did
+#by doing this we can tell which one is treatment group and after treading peirod.
+evil$did <- evil$time * evil$treated 
+
+
+#step four: difference in difference time 
+did_model_one <- lm(emp ~ treated + time + did, data = evil)
+
+#output the model 
+summary(did_model_one)
+
+#The did result is 3.1689 means after the minial wage increase, the 
+#employment increase 3.169 person or around 3 person. Also, with the Pr = 0.056 means
+# this is statstic significent. Sicne the linear regression result and quesiton c is close 
+#which mean I did it correct! yeeeeeeee
+
+```
+
+
+```{r}
+###########################################################################
+##Q2E#######################################################################
+
+# Repeat analysis for fries price
+did_model_two <- lm(pfry ~ treated + time + did, data = evil)
+did_model_three <- lm(psoda ~ treated + time + did, data = evil)
+
+#show the result
+summary(did_model_two)
+#The estimation is 0.001397 not statistically significant with p-value around 0.940 
+#therefore, we can conclude that we do not observe a statistically significant difference
+#between the treatment group and post-treatment over the same period. 
+
+summary(did_model_three)
+#The estimation is -0.002995 not statistically significant with p-value around 0.848
+#therefore, we can conclude that we do not observe a statistically significant difference
+#between the treatment group and post-treatment over the same period. 
+
+
+```
+
+```{r}
+##Q2F########################################################################
+#Q2F-A 
+  #no, it will not violate the assumption of as the shortage of photo impact the
+  #both state in the same amount of power, therefore it will not violate the assumption.
+
+
+#Q2F-B
+  #no, it will not violate the assumption. As this art of efficiently making french fries will
+  #continue remain the impact to the price of fries from the long ago to the end of treatment.
+  #therefore it will not violate the assumption.
+
+#Q2F-C
+  #yes, it will violate parallel trends assumption. As the cost of the price of the fries change
+  #between two time data collection caused by other reason.  violate the assumption that two state's
+  #price of fries should remain the similar trend without the impact of increase of the minimal wage.
+
+#Q2F-D
+  #no, it will not violate the parallel trends, as the increase of the cost of oil will impact both
+  #state, therefore its reasonable to assume it will the parallel trends will hold.
+
+#Q2F-E
+  #yes, it will violate the parallel trends assumption. As the cost of product only fall in the New Jersey.
+  #Means the trend is no long parallel.
+
+#Q2g
+  #Yeah, I think he is right. 
+  #Difference restaurant may have the different prices and policy when facing the adjustment of employ cost.
+  #Therefore, by controlling the chain, we can elimate the impact of chain to the result.
+
+
+
+```
