@@ -446,10 +446,6 @@ pd <- population_data_filtered %>% select ("REF_DATE", "GEO" , "VALUE")
 write.csv(pd, "pd.csv")
 
 
-
-
-
-
 #7.0 policy rate cleaning
 ####################################################################################
 #7.0 The policy rate
